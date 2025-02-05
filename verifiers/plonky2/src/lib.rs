@@ -86,9 +86,9 @@ impl<T: Config> Verifier for Plonky2<T> {
 
         let vk = plonky2_verifier::Vk::from(vk.clone());
 
-        verify(&vk, &raw_proof, &raw_pubs)
-        .inspect_err(|e| log::debug!("Proof verification failed: {:?}", e))
-        .map_err(|_| VerifyError::VerifyError)
+        verify(&vk, raw_proof, raw_pubs)
+            .inspect_err(|e| log::debug!("Proof verification failed: {:?}", e))
+            .map_err(|_| VerifyError::VerifyError)
     }
 
     fn validate_vk(vk: &Self::Vk) -> Result<(), VerifyError> {
@@ -97,8 +97,8 @@ impl<T: Config> Verifier for Plonky2<T> {
         let vk = plonky2_verifier::Vk::from(vk.clone());
 
         validate_vk(&vk)
-        .inspect_err(|e| log::debug!("VK validation failed: {:?}", e))
-        .map_err(|_| VerifyError::InvalidVerificationKey)
+            .inspect_err(|e| log::debug!("VK validation failed: {:?}", e))
+            .map_err(|_| VerifyError::InvalidVerificationKey)
     }
 
     fn pubs_bytes(pubs: &Self::Pubs) -> Cow<[u8]> {

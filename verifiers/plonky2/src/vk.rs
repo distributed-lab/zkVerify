@@ -1,5 +1,4 @@
-///! Verification Key to be morphed into `plonky2` variant.
-
+//! Verification Key to be morphed into `plonky2` variant.
 use crate::Config;
 use alloc::vec::Vec;
 
@@ -9,16 +8,11 @@ use codec::{Decode, Encode, MaxEncodedLen};
 use educe::Educe;
 use frame_support::pallet_prelude::TypeInfo;
 
-#[derive(Copy, Clone, Debug, PartialEq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Copy, Clone, Debug, PartialEq, Encode, Decode, MaxEncodedLen, TypeInfo, Default)]
 pub enum Plonky2Config {
     Keccak,
+    #[default]
     Poseidon,
-}
-
-impl Default for Plonky2Config {
-    fn default() -> Self {
-        Plonky2Config::Poseidon
-    }
 }
 
 // Here educe is used for Clone, Debug, and PartialEq to work around
@@ -38,18 +32,18 @@ impl<T: Config> MaxEncodedLen for VkWithConfig<T> {
     }
 }
 
-impl From<Plonky2Config> for plonky2_verifier::Plonky2Config{
+impl From<Plonky2Config> for plonky2_verifier::Plonky2Config {
     fn from(config: Plonky2Config) -> Self {
-        match config{
+        match config {
             Plonky2Config::Keccak => plonky2_verifier::Plonky2Config::Keccak,
             Plonky2Config::Poseidon => plonky2_verifier::Plonky2Config::Poseidon,
         }
     }
 }
 
-impl<T: Config> From<VkWithConfig<T>> for plonky2_verifier::Vk{
+impl<T: Config> From<VkWithConfig<T>> for plonky2_verifier::Vk {
     fn from(vk: VkWithConfig<T>) -> Self {
-        Self{
+        Self {
             config: vk.config.into(),
             bytes: vk.bytes,
         }
@@ -70,7 +64,7 @@ impl<T: Config> VkWithConfig<T> {
     #[allow(dead_code)] // used in resources.rs
     pub(crate) fn from_default_with_bytes(bytes: Vec<u8>) -> Self {
         Self {
-             bytes,
+            bytes,
             ..Default::default()
         }
     }

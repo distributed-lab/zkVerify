@@ -50,8 +50,8 @@ mod reject {
             pubs,
         } = valid_test_data;
 
-        let len = proof.len();
-        proof[len - 1] = pubs.last().unwrap().wrapping_add(1);
+        let len = proof.bytes.len();
+        proof.bytes[len - 1] = pubs.last().unwrap().wrapping_add(1);
 
         assert_err!(
             Plonky2::<MockConfig>::verify_proof(&vk, &proof, &pubs),

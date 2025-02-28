@@ -1,7 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
+pub use crate::proof::Proof as MorphProof;
 pub use crate::vk::{Plonky2Config, VkWithConfig};
+
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use frame_support::__private::Get;
@@ -15,6 +17,7 @@ use plonky2_verifier::verify;
 mod resources;
 
 pub mod benchmarking;
+mod proof;
 pub(crate) mod verifier_should;
 mod vk;
 mod weight;
@@ -22,13 +25,22 @@ mod weight;
 pub use weight::WeightInfo;
 
 pub type Pubs = Vec<u8>;
-pub type Proof = Vec<u8>;
+pub type Proof<T> = MorphProof<T>;
 pub type Vk<T> = VkWithConfig<T>;
 
 impl<T: Config> Vk<T> {
     pub fn validate_size(&self) -> Result<(), VerifyError> {
         if self.bytes.len() > T::max_vk_size() as usize {
             return Err(VerifyError::InvalidVerificationKey);
+        }
+        Ok(())
+    }
+}
+
+impl<T: Config> Proof<T> {
+    pub fn validate_size(&self) -> Result<(), VerifyError> {
+        if self.bytes.len() > T::max_proof_size() as usize {
+            return Err(VerifyError::InvalidProofData);
         }
         Ok(())
     }
@@ -59,7 +71,7 @@ pub trait Config: 'static {
 pub struct Plonky2<T>;
 
 impl<T: Config> Verifier for Plonky2<T> {
-    type Proof = Proof;
+    type Proof = Proof<T>;
 
     type Pubs = Pubs;
 
@@ -74,19 +86,17 @@ impl<T: Config> Verifier for Plonky2<T> {
         raw_proof: &Self::Proof,
         raw_pubs: &Self::Pubs,
     ) -> Result<(), VerifyError> {
-        ensure!(
-            raw_proof.len() <= T::MaxProofSize::get() as usize,
-            hp_verifiers::VerifyError::InvalidProofData
-        );
+        vk.validate_size()?;
+        raw_proof.validate_size()?;
         ensure!(
             raw_pubs.len() <= T::MaxPubsSize::get() as usize,
             hp_verifiers::VerifyError::InvalidInput
         );
-        vk.validate_size()?;
 
         let vk = plonky2_verifier::Vk::from(vk.clone());
+        let proof = plonky2_verifier::Proof::from(raw_proof.clone());
 
-        verify(&vk, raw_proof, raw_pubs)
+        verify(&vk, &proof, raw_pubs)
             .inspect_err(|e| log::debug!("Proof verification failed: {:?}", e))
             .map_err(|_| VerifyError::VerifyError)
     }

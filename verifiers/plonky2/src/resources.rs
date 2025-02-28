@@ -13,7 +13,7 @@ impl crate::Config for MockConfig {
 #[allow(dead_code)]
 struct TestData<T: Config> {
     pub(crate) vk: Vk<T>,
-    pub(crate) proof: Proof,
+    pub(crate) proof: Proof<T>,
     pub(crate) pubs: Pubs,
 }
 
@@ -21,7 +21,7 @@ struct TestData<T: Config> {
 fn get_valid_test_data<T: Config>() -> TestData<T> {
     TestData {
         vk: VkWithConfig::from_default_with_bytes(include_bytes!("resources/vk.bin").to_vec()),
-        proof: include_bytes!("resources/proof.bin").to_vec(),
+        proof: Proof::from_default_with_bytes(include_bytes!("resources/proof.bin").to_vec()),
         pubs: include_bytes!("resources/pubs.bin").to_vec(),
     }
 }

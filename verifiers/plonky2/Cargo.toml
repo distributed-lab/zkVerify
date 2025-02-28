@@ -23,7 +23,7 @@ frame-benchmarking = { workspace = true, optional = true }
 pallet-verifiers = { workspace = true }
 sp-io = { workspace = true, optional = true }
 frame-support = { workspace = true }
-plonky2-verifier = {git = "https://github.com/distributed-lab/plonky2-verifier", tag = "v0.1.1", default-features = false}
+plonky2-verifier = {git = "https://github.com/distributed-lab/plonky2-verifier", tag = "v0.1.2", default-features = false}
 pallet-aggregate = { workspace = true, optional = true, default-features = false, features = [
     "runtime-benchmarks",
 ] }

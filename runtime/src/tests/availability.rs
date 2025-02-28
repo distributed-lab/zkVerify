@@ -325,7 +325,7 @@ fn pallet_plonky2_availability() {
         let dummy_origin = AccountId32::new([0; 32]);
 
         let dummy_vk = pallet_plonky2_verifier::VkWithConfig::default();
-        let dummy_proof = Vec::new();
+        let dummy_proof = pallet_plonky2_verifier::Proof::default();
         let dummy_pubs = Vec::new();
 
         assert!(SettlementPlonky2Pallet::submit_proof(

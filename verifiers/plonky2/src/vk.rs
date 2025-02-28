@@ -28,7 +28,9 @@ pub struct VkWithConfig<T> {
 
 impl<T: Config> MaxEncodedLen for VkWithConfig<T> {
     fn max_encoded_len() -> usize {
-        Plonky2Config::max_encoded_len() + T::max_vk_size() as usize
+        Plonky2Config::max_encoded_len()
+            + codec::Compact(T::max_vk_size()).encoded_size()
+            + T::max_vk_size() as usize
     }
 }
 

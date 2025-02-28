@@ -1041,9 +1041,9 @@ impl IsmpRouter for ModuleRouter {
 }
 
 parameter_types! {
-    pub const Plonky2MaxPubsSize: u32 = 262_144;
+    pub const Plonky2MaxPubsSize: u32 = 512; // eq of 64 public inputs
     pub const Plonky2MaxProofSize: u32 = 262_144;
-    pub const Plonky2MaxVkSize: u32 = 262_144;
+    pub const Plonky2MaxVkSize: u32 = 50_000;
 }
 
 impl pallet_plonky2_verifier::Config for Runtime {

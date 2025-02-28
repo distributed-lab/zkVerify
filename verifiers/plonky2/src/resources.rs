@@ -13,8 +13,8 @@ impl crate::Config for MockConfig {
 #[allow(dead_code)]
 struct TestData<T: Config> {
     pub(crate) vk: Vk<T>,
-    proof: Proof,
-    pubs: Pubs,
+    pub(crate) proof: Proof,
+    pub(crate) pubs: Pubs,
 }
 
 #[allow(dead_code)]

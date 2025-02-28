@@ -27,10 +27,10 @@ pub type Vk<T> = VkWithConfig<T>;
 
 impl<T: Config> Vk<T> {
     pub fn validate_size(&self) -> Result<(), VerifyError> {
-        match self.bytes.len() < T::max_vk_size() as usize {
-            true => Ok(()),
-            false => Err(VerifyError::InvalidVerificationKey),
+        if self.bytes.len() > T::max_vk_size() as usize {
+            return Err(VerifyError::InvalidVerificationKey);
         }
+        Ok(())
     }
 }
 
@@ -111,24 +111,33 @@ pub struct Plonky2Weight<W: weight::WeightInfo>(PhantomData<W>);
 impl<T: Config, W: weight::WeightInfo> pallet_verifiers::WeightInfo<Plonky2<T>>
     for Plonky2Weight<W>
 {
-    fn submit_proof(
+    fn verify_proof(
         _proof: &<Plonky2<T> as hp_verifiers::Verifier>::Proof,
         _pubs: &<Plonky2<T> as hp_verifiers::Verifier>::Pubs,
     ) -> Weight {
-        W::submit_proof()
-    }
-
-    fn submit_proof_with_vk_hash(
-        _proof: &<Plonky2<T> as hp_verifiers::Verifier>::Proof,
-        _pubs: &<Plonky2<T> as hp_verifiers::Verifier>::Pubs,
-    ) -> Weight {
-        W::submit_proof_with_vk_hash()
+        W::verify_proof()
     }
 
     fn register_vk(_vk: &<Plonky2<T> as hp_verifiers::Verifier>::Vk) -> Weight {
         W::register_vk()
     }
-    fn unregister_vk() -> Weight {
+
+    fn unregister_vk() -> frame_support::weights::Weight {
         W::unregister_vk()
+    }
+
+    fn get_vk() -> Weight {
+        W::get_vk()
+    }
+
+    fn validate_vk(_vk: &<Plonky2<T> as hp_verifiers::Verifier>::Vk) -> Weight {
+        W::validate_vk()
+    }
+
+    fn compute_statement_hash(
+        _proof: &<Plonky2<T> as Verifier>::Proof,
+        _pubs: &<Plonky2<T> as Verifier>::Pubs,
+    ) -> Weight {
+        W::compute_statement_hash()
     }
 }

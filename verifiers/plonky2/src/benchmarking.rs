@@ -1,96 +1,110 @@
 #![cfg(feature = "runtime-benchmarks")]
 
-use crate::Plonky2;
+use crate::Plonky2 as Verifier;
 use frame_benchmarking::v2::*;
-use frame_support::traits::{Consideration, Footprint};
 use frame_system::RawOrigin;
-use hp_verifiers::Verifier;
-use pallet_aggregate::{funded_account, insert_domain};
-use pallet_verifiers::{Tickets, VkEntry, VkOrHash, Vks};
+use hp_verifiers::Verifier as _;
+use pallet_verifiers::{benchmarking_utils, VkOrHash};
 
 pub struct Pallet<T: Config>(crate::Pallet<T>);
 pub trait Config: crate::Config {}
 impl<T: crate::Config> Config for T {}
-pub type Call<T> = pallet_verifiers::Call<T, Plonky2<T>>;
+pub type Call<T> = pallet_verifiers::Call<T, Verifier<T>>;
 
 include!("resources.rs");
 
-fn init<T: pallet_aggregate::Config>() -> (T::AccountId, u32) {
-    let caller: T::AccountId = funded_account::<T>();
-    let domain_id = 1;
-    insert_domain::<T>(domain_id, caller.clone(), Some(1));
-    (caller, domain_id)
-}
-
-#[benchmarks(where T: pallet_verifiers::Config<Plonky2<T>> + pallet_aggregate::Config)]
+#[benchmarks(where T: pallet_verifiers::Config<Verifier<T>>)]
 mod benchmarks {
-
     use super::*;
 
+    benchmarking_utils!(Verifier<T>, crate::Config);
+
     #[benchmark]
-    fn submit_proof() {
-        let (caller, domain_id) = init::<T>();
+    fn verify_proof() {
+        let data = get_valid_test_data();
 
-        let TestData { vk, proof, pubs } = get_valid_test_data();
+        let proof = data.proof;
+        let pubs = data.pubs;
+        let vk = data.vk;
 
-        #[extrinsic_call]
-        submit_proof(
-            RawOrigin::Signed(caller),
-            VkOrHash::from_vk(vk),
-            proof.into(),
-            pubs.into(),
-            Some(domain_id),
-        );
+        let r;
+        #[block]
+        {
+            r = do_verify_proof::<T>(&vk, &proof, &pubs)
+        };
+        assert!(r.is_ok());
     }
 
     #[benchmark]
-    fn submit_proof_with_vk_hash() {
-        // setup code
-        let (caller, domain_id) = init::<T>();
-
-        let TestData { vk, proof, pubs } = get_valid_test_data();
-        let vk_entry = VkEntry::new(vk);
+    fn get_vk() {
+        let vk = get_valid_test_data().vk;
         let hash = sp_core::H256::repeat_byte(2);
-        Vks::<T, Plonky2<T>>::insert(hash, vk_entry);
 
-        #[extrinsic_call]
-        submit_proof(
-            RawOrigin::Signed(caller),
-            VkOrHash::from_hash(hash),
-            proof.into(),
-            pubs.into(),
-            Some(domain_id),
-        );
+        insert_vk_anonymous::<T>(vk, hash);
+
+        let r;
+        #[block]
+        {
+            r = do_get_vk::<T>(&hash)
+        };
+        assert!(r.is_some());
+    }
+
+    #[benchmark]
+    fn validate_vk() {
+        let vk = get_valid_test_data().vk;
+
+        let r;
+        #[block]
+        {
+            r = do_validate_vk::<T>(&vk)
+        };
+        assert!(r.is_ok());
+    }
+
+    #[benchmark]
+    fn compute_statement_hash() {
+        let data = get_valid_test_data();
+
+        let proof = data.proof;
+        let pubs = data.pubs;
+        let vk = data.vk.into();
+
+        let vk = VkOrHash::Vk(vk);
+
+        #[block]
+        {
+            do_compute_statement_hash::<T>(&vk, &proof, &pubs);
+        }
     }
 
     #[benchmark]
     fn register_vk() {
         // setup code
-        let caller: T::AccountId = funded_account::<T>();
+        let caller = funded_account::<T>();
         let vk = get_valid_test_data().vk;
 
         #[extrinsic_call]
         register_vk(RawOrigin::Signed(caller), vk.clone().into());
 
         // Verify
-        assert!(Vks::<T, Plonky2<T>>::get(Plonky2::<T>::vk_hash(&vk)).is_some());
+        assert!(do_get_vk::<T>(&do_vk_hash::<T>(&vk)).is_some());
     }
 
     #[benchmark]
     fn unregister_vk() {
         // setup code
-        let caller: T::AccountId = funded_account::<T>();
+        let caller = funded_account::<T>();
         let hash = sp_core::H256::repeat_byte(2);
         let vk = get_valid_test_data().vk;
-        let vk_entry = VkEntry::new(vk.clone());
-        let footprint = Footprint::from_encodable(&vk);
-        let ticket = T::Ticket::new(&caller, footprint).unwrap();
 
-        Vks::<T, Plonky2<T>>::insert(hash, vk_entry);
-        Tickets::<T, Plonky2<T>>::insert((caller.clone(), hash), ticket);
+        insert_vk::<T>(caller.clone(), vk, hash);
 
         #[extrinsic_call]
         unregister_vk(RawOrigin::Signed(caller), hash);
+
+        // Verify
+        assert!(do_get_vk::<T>(&hash).is_none());
     }
 
     impl_benchmark_test_suite!(Pallet, super::mock::test_ext(), super::mock::Test);
@@ -98,26 +112,32 @@ mod benchmarks {
 
 #[cfg(test)]
 mod mock {
-    use frame_support::sp_runtime::{traits::IdentityLookup, BuildStorage};
-    use frame_support::traits::fungible::HoldConsideration;
-    use frame_support::traits::LinearStoragePrice;
-    use frame_support::{derive_impl, parameter_types, traits::EnsureOrigin};
-    use sp_core::{ConstU32, ConstU64};
+    use frame_support::{
+        derive_impl, parameter_types,
+        sp_runtime::{traits::IdentityLookup, BuildStorage},
+        traits::{fungible::HoldConsideration, LinearStoragePrice},
+    };
+    use sp_core::{ConstU128, ConstU32};
+
+    type Balance = u128;
+    type AccountId = u64;
 
     // Configure a mock runtime to test the pallet.
     frame_support::construct_runtime!(
         pub enum Test
         {
             System: frame_system,
-            VerifierPallet: crate,
             Balances: pallet_balances,
             CommonVerifiersPallet: pallet_verifiers::common,
-            Aggregate: pallet_aggregate,
+            VerifierPallet: crate,
         }
     );
 
-    type Balance = u64;
-    type AccountId = u64;
+    impl crate::Config for Test {
+        type MaxProofSize = ConstU32<1000000>;
+        type MaxPubsSize = ConstU32<1000000>;
+        type MaxVkSize = ConstU32<1000000>;
+    }
 
     #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig as frame_system::DefaultConfig)]
     impl frame_system::Config for Test {
@@ -133,31 +153,16 @@ mod mock {
         pub const HoldReasonVkRegistration: RuntimeHoldReason = RuntimeHoldReason::CommonVerifiersPallet(pallet_verifiers::common::HoldReason::VkRegistration);
     }
 
-    pub struct NoManager;
-    impl EnsureOrigin<RuntimeOrigin> for NoManager {
-        type Success = ();
-
-        fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
-            Err(o)
-        }
-
-        fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
-            Err(())
-        }
-    }
-
-    impl pallet_aggregate::Config for Test {
+    impl pallet_verifiers::Config<crate::Plonky2<Test>> for Test {
         type RuntimeEvent = RuntimeEvent;
-        type RuntimeHoldReason = RuntimeHoldReason;
-        type AggregationSize = ConstU32<32>;
-        type MaxPendingPublishQueueSize = ConstU32<16>;
-        type ManagerOrigin = NoManager;
-        type Hold = Balances;
-        type Consideration = ();
-        type EstimateCallFee = ConstU32<1_000_000>;
-        type ComputePublisherTip = ();
-        type WeightInfo = ();
-        const AGGREGATION_SIZE: u32 = 32;
+        type OnProofVerified = ();
+        type WeightInfo = crate::Plonky2Weight<()>;
+        type Ticket = HoldConsideration<
+            AccountId,
+            Balances,
+            HoldReasonVkRegistration,
+            LinearStoragePrice<BaseDeposit, PerByteDeposit, Balance>,
+        >;
         type Currency = Balances;
     }
 
@@ -168,32 +173,13 @@ mod mock {
         type WeightInfo = ();
         type Balance = Balance;
         type DustRemoval = ();
-        type ExistentialDeposit = ConstU64<1>;
+        type ExistentialDeposit = ConstU128<1>;
         type AccountStore = System;
         type ReserveIdentifier = [u8; 8];
         type FreezeIdentifier = RuntimeFreezeReason;
         type MaxLocks = ConstU32<10>;
         type MaxReserves = ConstU32<10>;
         type MaxFreezes = ConstU32<10>;
-    }
-
-    impl crate::Config for Test {
-        type MaxProofSize = ConstU32<1000000>;
-        type MaxPubsSize = ConstU32<1000000>;
-        type MaxVkSize = ConstU32<1000000>;
-    }
-
-    impl pallet_verifiers::Config<crate::Plonky2<Test>> for Test {
-        type RuntimeEvent = RuntimeEvent;
-        type OnProofVerified = Aggregate;
-        type WeightInfo = crate::Plonky2Weight<()>;
-        type Ticket = HoldConsideration<
-            AccountId,
-            Balances,
-            HoldReasonVkRegistration,
-            LinearStoragePrice<BaseDeposit, PerByteDeposit, Balance>,
-        >;
-        type Currency = Balances;
     }
 
     impl pallet_verifiers::common::Config for Test {

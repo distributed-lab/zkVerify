@@ -13,17 +13,23 @@ use core::marker::PhantomData;
 pub struct ZKVWeight<T>(PhantomData<T>);
 
 impl<T: frame_system::Config> pallet_plonky2_verifier::WeightInfo for ZKVWeight<T> {
-    fn submit_proof() -> Weight {
-        Weight::from_parts(1_000_000, 1000)
-            .saturating_add(T::DbWeight::get().reads(3_u64))
-            .saturating_add(T::DbWeight::get().writes(2_u64))
+    fn verify_proof() -> Weight {
+        Weight::from_parts(1_000_000_000, 0)
     }
 
-    fn submit_proof_with_vk_hash() -> Weight {
-        Weight::from_parts(1_000_000, 1000)
-            .saturating_add(T::DbWeight::get().reads(4_u64))
-            .saturating_add(T::DbWeight::get().writes(2_u64))
+    fn get_vk() -> Weight {
+        Weight::from_parts(1_000_000, 10000)
+            .saturating_add(T::DbWeight::get().reads(1_u64))
     }
+
+    fn validate_vk() -> Weight {
+        Weight::from_parts(100_000, 0)
+    }
+
+    fn compute_statement_hash() -> Weight {
+        Weight::from_parts(10_000_000, 0)
+    }
+
 
     fn register_vk() -> Weight {
         Weight::from_parts(1_000_000, 0)

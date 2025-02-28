@@ -72,4 +72,48 @@ mod reject {
             VerifyError::InvalidVerificationKey
         );
     }
+
+    #[rstest]
+    fn should_not_verify_oversized_vk(valid_test_data: TestData<MockConfig>) {
+        let TestData {
+            mut vk,
+            proof,
+            pubs,
+        } = valid_test_data;
+
+        vk.bytes = vec![0u8; MockConfig::max_vk_size() as usize + 1];
+
+        assert_err!(
+            Plonky2::<MockConfig>::verify_proof(&vk, &proof, &pubs),
+            VerifyError::InvalidVerificationKey
+        );
+    }
+
+    #[rstest]
+    fn should_not_verify_oversized_proof(valid_test_data: TestData<MockConfig>) {
+        let TestData {
+            vk,
+            mut proof,
+            pubs,
+        } = valid_test_data;
+
+        proof.bytes = vec![0u8; MockConfig::max_proof_size() as usize + 1];
+
+        assert_err!(
+            Plonky2::<MockConfig>::verify_proof(&vk, &proof, &pubs),
+            VerifyError::InvalidProofData
+        );
+    }
+
+    #[rstest]
+    fn should_not_verify_oversized_pubs(valid_test_data: TestData<MockConfig>) {
+        let TestData { vk, proof, .. } = valid_test_data;
+
+        let pubs = vec![0u8; MockConfig::max_pubs_size() as usize + 1];
+
+        assert_err!(
+            Plonky2::<MockConfig>::verify_proof(&vk, &proof, &pubs),
+            VerifyError::InvalidInput
+        );
+    }
 }

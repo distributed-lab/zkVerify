@@ -9576,8 +9576,8 @@ dependencies = [
 
 [[package]]
 name = "plonky2-verifier"
-version = "0.1.0"
-source = "git+https://github.com/distributed-lab/plonky2-verifier?tag=v0.1.0#6784aa080989f2bfa63ea22a0b57c8a5a6e823b5"
+version = "0.1.1"
+source = "git+https://github.com/distributed-lab/plonky2-verifier?tag=v0.1.1#e8160ebadc87ebfc5e1638e2d084b9ffe8661b69"
 dependencies = [
  "plonky2",
  "serde",
